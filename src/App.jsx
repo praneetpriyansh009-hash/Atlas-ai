@@ -138,6 +138,10 @@ const AppContent = () => {
 };
 
 const App = () => {
+    const { loading } = useAuth();
+    if (loading) {
+        return <SplashScreen />;
+    }
     return (
         <ThemeProvider>
             <AuthProvider>

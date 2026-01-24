@@ -89,7 +89,7 @@ const callGemini = async (prompt, modelName = "gemini-1.5-flash") => {
 };
 
 // --- Route: Podcast ---
-router.post('/podcast', verifyToken, async (req, res) => {
+router.post('/podcast', async (req, res) => {
     const { content, topics, mode, syllabus, provider = 'auto' } = req.body;
 
     try {
@@ -169,7 +169,7 @@ router.post('/podcast', verifyToken, async (req, res) => {
 });
 
 // --- Route: Gemini (legacy) ---
-router.post('/gemini', verifyToken, validateAIRequest, async (req, res) => {
+router.post('/gemini', validateAIRequest, async (req, res) => {
     try {
         const lastMsg = req.body.messages?.[req.body.messages.length - 1]?.content || "Hello";
         const result = await callGemini(lastMsg);
@@ -180,7 +180,7 @@ router.post('/gemini', verifyToken, validateAIRequest, async (req, res) => {
 });
 
 // --- Route: Groq ---
-router.post('/groq', verifyToken, validateAIRequest, async (req, res) => {
+router.post('/groq', validateAIRequest, async (req, res) => {
     try {
         if (!GROQ_API_KEY) return res.status(500).json({ error: 'Groq Key Missing' });
         const response = await fetchWithTimeout(GROQ_URL, {
