@@ -137,15 +137,23 @@ const AppContent = () => {
     );
 };
 
-const App = () => {
-    const { loading } = useAuth();
+// Inner component that can safely use useAuth (it's inside AuthProvider)
+const AuthGate = () => {
+    const { currentUser, loading } = useAuth();
+
+    // Show splash while Firebase is checking auth state
     if (loading) {
         return <SplashScreen />;
     }
+
+    return <AppContent />;
+};
+
+const App = () => {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <AppContent />
+                <AuthGate />
             </AuthProvider>
         </ThemeProvider>
     );
