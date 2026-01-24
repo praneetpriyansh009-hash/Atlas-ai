@@ -34,6 +34,13 @@ const chatSchema = z.object({
 });
 
 const verifyToken = async (req, res, next) => {
+    // If Firebase Admin is not initialized, skip auth (allows app to work without config)
+    if (!admin.apps.length) {
+        console.warn('[Auth] Firebase not configured - skipping token verification');
+        req.user = { uid: 'anonymous', email: 'guest@atlas.app' };
+        return next();
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Unauthorized: No token provided' });
