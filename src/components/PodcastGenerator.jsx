@@ -110,7 +110,7 @@ const PodcastGenerator = () => {
                 body: JSON.stringify({
                     mode: activeMode,
                     provider: provider,
-                    content: activeMode === 'upload' ? documentContent.slice(0, 15000) : null,
+                    content: activeMode === 'upload' ? documentContent.slice(0, 8000) : null,
                     topics: activeMode === 'upload' ? topics : null,
                     syllabus: activeMode === 'syllabus' ? syllabus : null
                 })
@@ -124,8 +124,8 @@ const PodcastGenerator = () => {
                 throw new Error("Invalid response format from server");
             }
         } catch (error) {
-            console.error("Generation error:", error);
-            alert("Failed to generate podcast script. Please try again.");
+            const msg = error.message || "Unknown error";
+            alert(`Failed to generate podcast: ${msg}`);
         } finally {
             setIsGenerating(false);
         }

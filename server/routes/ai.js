@@ -13,7 +13,7 @@ const GROQ_API_KEY = (process.env.GROQ_API_KEY || "").trim();
 const GEMINI_API_KEY = (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "").trim();
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = "llama-3.3-70b-versatile"; // Latest replacement for decommissioned 3.1 model
-const REQUEST_TIMEOUT = 50000;
+const REQUEST_TIMEOUT = 9000; // 9 seconds to fit within Vercel's 10s limit
 
 // Log key status for debugging
 console.log(`[AI Service] Groq Key Loaded: ${!!GROQ_API_KEY}`);
@@ -113,7 +113,7 @@ router.post('/podcast', verifyToken, async (req, res) => {
             - Make the conversation highly technical, detailed, and insightful.
             - Sam should explain concepts using "first principles".
             - Alex should ask follow-up questions that probe deeper into "why" and "how".
-            - 25-35 exchanges total (a long, thorough deep dive).
+            - 8-12 exchanges total (concise and high-impact).
             - Do not be generic; use specific examples and data points.
             - Valid JSON object/array only.
         `;
@@ -141,13 +141,19 @@ router.post('/podcast', verifyToken, async (req, res) => {
         }
 
         // Cleanup and Parse
+        console.log(`[Podcast] Raw result length: ${resultText.length}`);
         const cleanedText = resultText.replace(/```json|```/g, '').trim();
         let finalJson;
         try {
             finalJson = JSON.parse(cleanedText);
+            console.log(`[Podcast] Successfully parsed JSON with ${finalJson.script?.length || 0} lines`);
         } catch (e) {
+            console.error("[Podcast] JSON Parse Error. Raw text snippet:", cleanedText.substring(0, 100));
             const match = cleanedText.match(/\[\s*\{.*\}\s*\]/s);
-            if (match) finalJson = { script: JSON.parse(match[0]) };
+            if (match) {
+                finalJson = { script: JSON.parse(match[0]) };
+                console.log("[Podcast] Recovered via regex match");
+            }
             else throw new Error("AI returned invalid JSON structure");
         }
 
