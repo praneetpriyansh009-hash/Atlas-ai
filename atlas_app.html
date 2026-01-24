@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATLAS Premium Platform</title>
+
+    <!-- React, ReactDOM, and Babel -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script type="module">
+        import * as LucideReact from 'https://cdn.jsdelivr.net/npm/lucide-react@0.454.0/+esm';
+        window.LucideReact = LucideReact;
+    </script>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        // Extract all Lucide icons we need
+        const {
+            Bot, BookOpen, Search, RotateCw, Send, Menu, X, GraduationCap, Code, Server,
+            AlertTriangle, Loader2, ClipboardList, MessageSquare, Lightbulb, MapPin, Trophy,
+            Link: LinkIcon, Globe, Sparkles, ChevronRight, ChevronLeft, LayoutDashboard,
+            User, Cpu, FileText, CheckCircle, ArrowLeft, Brain, UserCheck
+        } = window.LucideReact;
+
+        const { useState, useEffect, useCallback, useRef } = React;
+
+        // --- Global Constants ---
+        const MODEL_NAME = 'gemini-2.5-flash-preview-09-2025';
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
+        const API_KEY = "AIzaSyBifpoIxQ4cHpx2CpbD8JzrEH-vemghthg"; // Your API key
+
+        // Mock Syllabus Data for RAG
+        const MOCK_SYLLABUS = `
+  --- Class 10 History: Rise of Nationalism ---
+  The rise of nationalism in Europe was primarily driven by the **French Revolution** (1789), which introduced the ideas of 'liberty, equality, fraternity' and the concept of the **nation-state** based on shared identity, not just a ruling monarch. 
+  Key figures include Giuseppe Garibaldi, who unified southern Italy, and Otto von Bismarck, whose 'Blood and Iron' policy led to German unification. The syllabus emphasizes the shift from absolute monarchies to sovereign nation-states.
+
+  --- Physics: Newton's Laws ---
+  Newton's Second Law of Motion is defined by the equation **F=ma**, where acceleration (a) is directly proportional to the net force (F) and inversely proportional to the mass (m). The syllabus application focuses on solving problems involving constant mass and variable forces, specifically motion on inclined planes and systems with pulleys.
+`;
+
+        // Custom CSS
+        const styles = `
+  @keyframes gradient-x {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  @keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+  }
+
+  @keyframes slide-up {
+    0% { opacity: 0; transform: translateY(40px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes message-pop {
+    0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  @keyframes view-transition { 
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  .animate-slide-up {
+    animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .animate-slide-up-delay-1 {
+    animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+    opacity: 0;
+  }
+  .animate-message {
+    animation: message-pop 0.3s ease-out;
+  }
+  .animate-view-transition { 
+    animation: view-transition 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; 
+  }
+
+  .glass-panel {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .glass-panel-lighter {
+    background: rgba(31, 41, 55, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.05);
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.3);
+  }
+`;
+
+        // Hook for retry logic
+        const useRetryableFetch = () => {
+            const maxRetries = 3;
+
+            const retryableFetch = useCallback(async (url, options) => {
+                let lastError = null;
+                for (let attempt = 0; attempt < maxRetries; attempt++) {
+                    try {
+                        if (attempt > 0) {
+                            const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                        const response = await fetch(url, options);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return await response.json();
+                    } catch (error) {
+                        lastError = error;
+                    }
+                }
+                throw new Error(`Failed after ${maxRetries} attempts. Last error: ${lastError ? lastError.message : 'Unknown error'}`);
+            }, [maxRetries]);
+
+            return retryableFetch;
+        };
+
+        // SPLASH SCREEN
+        const SplashScreen = ({ onComplete }) => {
+            const [step, setStep] = useState(0);
+
+            useEffect(() => {
+                const timers = [
+                    setTimeout(() => setStep(1), 500),
+                    setTimeout(() => setStep(2), 1500),
+                    setTimeout(() => setStep(3), 2500),
+                    setTimeout(onComplete, 3000)
+                ];
+                return () => timers.forEach(clearTimeout);
+            }, [onComplete]);
+
+            if (step === 3) return null;
+
+            return (
+                <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-gray-900 transition-opacity duration-700 ${step === 3 ? 'opacity-0' : 'opacity-100'}`}>
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-indigo-500 rounded-full blur-3xl opacity-20 animate-pulse"></div>
+                        <div className={`relative transition-all duration-1000 transform ${step >= 1 ? 'scale-100 opacity-100' : 'scale-50 opacity-0'}`}>
+                            <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-2xl flex items-center justify-center shadow-2xl animate-float">
+                                <Cpu className="w-12 h-12 text-white" />
+                            </div>
+                        </div>
+                    </div>
+                    <h1 className={`mt-8 text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-purple-300 tracking-wider transition-all duration-1000 transform ${step >= 2 ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
+                        ATLAS PREMIUM PLATFORM
+                    </h1>
+                    <p className={`mt-2 text-gray-400 text-sm tracking-widest uppercase transition-all duration-1000 delay-300 transform ${step >= 2 ? 'opacity-100' : 'opacity-0'}`}>
+                        Adaptive Learning Intelligence
+                    </p>
+                </div>
+            );
+        };
+
+        // Rest of your components and App code will be embedded here...
+        // Due to message length limits, I'll create this in another file
+
+        // Render the app
+        setTimeout(() => {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        }, 100);
+    </script>
+
+    <script type="text/babel" src="./atlas_components.js"></script>
+</body>
+
+</html>
