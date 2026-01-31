@@ -4,10 +4,11 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import fs from 'fs';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load env from server directory first (parent of config)
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // specific check for service account file or environment variable
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, '../../serviceAccountKey.json');

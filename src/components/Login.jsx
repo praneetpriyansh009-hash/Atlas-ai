@@ -51,15 +51,15 @@ const Login = ({ onSwitchToSignup }) => {
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-indigo-900 via-gray-900 to-black">
+        <div className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-amber-900 via-gray-900 to-black">
             {/* Animated 3D Background Elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[100px] animate-pulse-soft"></div>
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[100px] animate-float-delayed"></div>
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-amber-600/20 rounded-full blur-[100px] animate-pulse-soft"></div>
+                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-orange-600/20 rounded-full blur-[100px] animate-float-delayed"></div>
 
                 {/* Floating Orbs */}
-                <div className="absolute top-20 right-20 w-16 h-16 bg-gradient-to-tr from-cyan-400 to-blue-500 rounded-full blur-xl opacity-60 animate-float"></div>
-                <div className="absolute bottom-20 left-20 w-24 h-24 bg-gradient-to-tr from-pink-500 to-rose-500 rounded-full blur-xl opacity-50 animate-float-delayed"></div>
+                <div className="absolute top-20 right-20 w-16 h-16 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full blur-xl opacity-60 animate-float"></div>
+                <div className="absolute bottom-20 left-20 w-24 h-24 bg-gradient-to-tr from-rose-500 to-pink-500 rounded-full blur-xl opacity-50 animate-float-delayed"></div>
             </div>
 
             {/* 3D Tilt Card */}
@@ -71,16 +71,16 @@ const Login = ({ onSwitchToSignup }) => {
                 style={{ transform: 'perspective(1000px)' }}
             >
                 {/* Glow Effect behind card */}
-                <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-600 rounded-3xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
+                <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 via-orange-500 to-rose-600 rounded-3xl blur opacity-25 group-hover:opacity-75 transition duration-1000 group-hover:duration-200"></div>
 
                 {/* Main Card Content */}
                 <div className="relative p-8 bg-gray-900/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col items-center text-center transform-style-3d">
 
                     {/* Floating Icon */}
                     <div className="mb-6 relative transform-style-3d tilt-content">
-                        <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse"></div>
-                        <div className="relative w-20 h-20 bg-gradient-to-tr from-gray-800 to-gray-900 rounded-2xl border border-white/10 flex items-center justify-center shadow-inner">
-                            <Bot className="w-10 h-10 text-indigo-400" />
+                        <div className="absolute inset-0 bg-amber-500 blur-2xl opacity-20 animate-pulse"></div>
+                        <div className="relative w-20 h-20 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-2xl border border-white/10 flex items-center justify-center shadow-inner">
+                            <Sparkles className="w-10 h-10 text-white" />
                         </div>
                         <div className="absolute -top-2 -right-2">
                             <Sparkles className="w-6 h-6 text-yellow-400 animate-spin-slow" />
@@ -88,11 +88,11 @@ const Login = ({ onSwitchToSignup }) => {
                     </div>
 
                     <h2 className="text-3xl font-display font-bold text-white mb-2 tilt-content tracking-tight">
-                        Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Atlas</span>
+                        Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">Aurem</span>
                     </h2>
 
                     <p className="text-gray-400 text-sm mb-8 tilt-content leading-relaxed">
-                        Your intelligent AI companion for <br /> academic excellence and discovery.
+                        Where Curiosity Becomes Clarity.<br />Your AI-Powered Learning Companion.
                     </p>
 
                     {error && (
@@ -122,7 +122,7 @@ const Login = ({ onSwitchToSignup }) => {
                     </div>
 
                     <div className="mt-8 pt-6 border-t border-white/5 w-full flex justify-between items-center text-xs text-gray-500">
-                        <span>v2.0 Premium</span>
+                        <span>Aurem v2.0</span>
                         <div className="flex items-center gap-1">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
                             <span>Systems Online</span>

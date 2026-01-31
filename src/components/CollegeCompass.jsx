@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ClipboardList, MessageSquare, Loader2, Lightbulb, Link, Globe, Send, Sparkles, Brain, Trophy, MapPin, GraduationCap, Map } from './Icons';
+import { ClipboardList, MessageSquare, Loader2, Lightbulb, Link, Globe, Send, Sparkles, Brain, Trophy, MapPin, GraduationCap, Map, Crown } from './Icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import { GROQ_API_URL, formatGroqPayload } from '../utils/api';
 
 const CollegeCompass = ({ retryableFetch }) => {
     const { isDark } = useTheme();
+    const { canUseFeature, incrementUsage, triggerUpgradeModal, isPro, getRemainingUses } = useSubscription();
     const [activeTab, setActiveTab] = useState('career'); // career, college, chat
     const [formData, setFormData] = useState({ gpa: '', major: '', extracurriculars: '', location: '' });
     const [careerFormData, setCareerFormData] = useState({ hobbies: '', passion: '', field: '', aspirations: '' });
@@ -25,6 +27,13 @@ const CollegeCompass = ({ retryableFetch }) => {
 
     const handleCareerSubmit = async (e) => {
         e.preventDefault();
+
+        // Check usage limits for Basic users
+        if (!canUseFeature('college-compass')) {
+            triggerUpgradeModal('college-compass');
+            return;
+        }
+
         setIsLoading(true);
         setCareerResult('');
 
@@ -60,6 +69,8 @@ const CollegeCompass = ({ retryableFetch }) => {
             });
             const text = result.choices?.[0]?.message?.content || "No career path generated.";
             setCareerResult(text);
+            // Track usage after successful generation
+            incrementUsage('college-compass');
         } catch (err) {
             setCareerResult("Career AI Error: " + err.message);
         } finally { setIsLoading(false); }
@@ -67,6 +78,13 @@ const CollegeCompass = ({ retryableFetch }) => {
 
     const handleStructuredSubmit = async (e) => {
         e.preventDefault();
+
+        // Check usage limits for Basic users
+        if (!canUseFeature('college-compass')) {
+            triggerUpgradeModal('college-compass');
+            return;
+        }
+
         setIsLoading(true);
         setStructuredResult('');
         setCitations([]);
@@ -107,6 +125,8 @@ const CollegeCompass = ({ retryableFetch }) => {
 
             setStructuredResult(text);
             setCitations(sources);
+            // Track usage after successful generation
+            incrementUsage('college-compass');
         } catch (err) {
             setStructuredResult("College Compass AI Error: " + err.message);
         } finally { setIsLoading(false); }
@@ -162,6 +182,18 @@ const CollegeCompass = ({ retryableFetch }) => {
                 <p className={`text-xs font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-400' : 'text-theme-muted'}`}>
                     AI-Driven Future Architecture
                 </p>
+                {/* Tier Badge */}
+                <div className="mt-3 flex items-center justify-center gap-2">
+                    {isPro ? (
+                        <span className="flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-black uppercase">
+                            <Crown className="w-3 h-3" /> Pro • Unlimited
+                        </span>
+                    ) : (
+                        <span className="text-[10px] text-rose-500 font-bold">
+                            Basic • {getRemainingUses('college-compass')} uses left today
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="p-4 md:p-8 max-w-5xl mx-auto w-full flex-1">

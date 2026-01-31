@@ -1,34 +1,109 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, User, Bot, Loader2, Send, BookOpen, Clock, BrainCircuit } from './Icons';
+import { Sparkles, User, Bot, Loader2, Send, BookOpen, Clock, BrainCircuit, Image, X, Upload, Crown } from './Icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import { GROQ_API_URL } from '../utils/api';
 
 const DoubtSolver = ({ retryableFetch }) => {
     const { isDark } = useTheme();
+    const { isPro, triggerUpgradeModal } = useSubscription();
     const [messages, setMessages] = useState([{
         role: 'assistant',
-        content: "Hello! I'm ATLAS, your AI study companion. Ask me anything about your subjects, and I'll help you understand it clearly!",
+        content: "Hello! I'm AUREM, your AI study companion. Ask me anything about your subjects, and I'll help you understand it clearly!",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null); // base64 string
+    const [imagePreview, setImagePreview] = useState(null);
     const messagesEndRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // Compress image to stay under Groq's 4MB limit
+    const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new window.Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Scale down if too large
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Convert to JPEG for better compression
+                    const compressed = canvas.toDataURL('image/jpeg', quality);
+                    resolve(compressed);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!isPro) {
+            triggerUpgradeModal('vision');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
+
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file');
+            return;
+        }
+
+        try {
+            // Compress image to stay under 4MB limit
+            const compressed = await compressImage(file, 1024, 0.8);
+            setImagePreview(compressed);
+            setSelectedImage(compressed.split(',')[1]);
+        } catch (err) {
+            console.error('Image compression error:', err);
+            alert('Failed to process image. Please try a smaller image.');
+        }
+    };
+
+    const clearImage = () => {
+        setSelectedImage(null);
+        setImagePreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
     const handleSendMessage = async (e) => {
         if (e) e.preventDefault();
-        if (!input.trim() || isLoading) return;
+        if ((!input.trim() && !selectedImage) || isLoading) return;
 
         const userQuestion = input.trim();
+        const imageToSend = selectedImage;
+        const imagePreviewToSend = imagePreview;
+
+        // Clear input state immediately
         setInput('');
+        clearImage();
 
         // Add user message to state
         const newMessage = {
             role: 'user',
-            content: userQuestion,
+            content: userQuestion || (imageToSend ? '[Image Uploaded]' : ''),
+            image: imagePreviewToSend,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
 
@@ -36,7 +111,7 @@ const DoubtSolver = ({ retryableFetch }) => {
         setIsLoading(true);
 
         // --- IMPROVED SYSTEM PROMPT ---
-        let systemPrompt = `You are ATLAS, an advanced AI study companion designed to be accurate, concise, and logical.
+        let systemPrompt = `You are AUREM, an advanced AI study companion designed to be accurate, concise, and logical.
 
         CORE INSTRUCTIONS:
         1. **Direct Answer**: Start with a direct answer to the user's question. Avoid meta-commentary like "Here is the answer".
@@ -44,35 +119,50 @@ const DoubtSolver = ({ retryableFetch }) => {
         3. **Tone**: Professional yet encouraging. Avoid flowery or overly dramatic language.
         4. **Formatting**: Use bold terms for key concepts and bullet points for lists.
         5. **Context Check**: If syllabus context is provided below, use it ONLY if it directly answers the question. If the context is irrelevant to the specific question, ignore it and answer from general knowledge.
+        6. **Vision**: If an image is provided, analyze it thoroughly to answer the user's request.
 
         STRICT PROHIBITIIONS:
         - Do not hallucinate facts.
         - Do not provide irrational or disjointed statements.
         - Do not apologize excessively.`;
 
-        let context = "";
-        let isSyllabusVerified = false;
-
         try {
-            // RAG Disabled by user request.
-            // Proceeding with direct LLM query.
+            let payload;
 
-            // Build payload for Groq
-            // Build payload for Groq with HISTORY
-            // Convert existing messages to API format
-            const conversationHistory = messages.map(msg => ({
-                role: msg.role,
-                content: msg.content
-            }));
+            // Vision Request (Llama 4 Scout - current supported vision model)
+            if (imageToSend) {
+                payload = {
+                    model: "meta-llama/llama-4-scout-17b-16e-instruct",
+                    messages: [
+                        {
+                            role: "user",
+                            content: [
+                                { type: "text", text: `${systemPrompt}\n\nUSER QUESTION: ${userQuestion || "Analyze this image."}` },
+                                { type: "image_url", image_url: { url: imagePreviewToSend } }
+                            ]
+                        }
+                    ],
+                    temperature: 0.5,
+                    max_tokens: 1024
+                };
+            }
+            // Text Request (Llama 3.3 70B)
+            else {
+                // Build payload for Groq with HISTORY
+                const conversationHistory = messages.map(msg => ({
+                    role: msg.role,
+                    content: msg.content
+                }));
 
-            const payload = {
-                model: "llama-3.3-70b-versatile",
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    ...conversationHistory,
-                    { role: 'user', content: userQuestion }
-                ]
-            };
+                payload = {
+                    model: "llama-3.3-70b-versatile",
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        ...conversationHistory,
+                        { role: 'user', content: userQuestion }
+                    ]
+                };
+            }
 
             const result = await retryableFetch(GROQ_API_URL, {
                 method: 'POST',
@@ -80,22 +170,25 @@ const DoubtSolver = ({ retryableFetch }) => {
                 body: JSON.stringify(payload)
             });
 
-            if (result.error) throw new Error(result.error);
+            if (result.error) {
+                const errMsg = typeof result.error === 'string' ? result.error : JSON.stringify(result.error);
+                throw new Error(errMsg);
+            }
 
             const responseText = result.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
 
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: responseText,
-                isSyllabusVerified,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }]);
 
         } catch (err) {
             console.error(err);
+            const errorMessage = err.message || (typeof err === 'string' ? err : JSON.stringify(err));
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `Error details: ${err.message}`, // Expose error for debugging
+                content: `Error: ${errorMessage}`,
                 isError: true,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             }]);
@@ -138,10 +231,10 @@ const DoubtSolver = ({ retryableFetch }) => {
                         <BrainCircuit className="w-6 h-6" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-display font-bold text-theme-primary tracking-tight">ATLAS Intelligence</h2>
+                        <h2 className="text-lg font-display font-bold text-theme-primary tracking-tight">Aurem Intelligence</h2>
                         <div className="flex items-center mt-0.5">
                             <span className="flex w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                            <p className="text-[10px] font-medium text-theme-muted uppercase tracking-wider">Systems v3.0</p>
+                            <p className="text-[10px] font-medium text-theme-muted uppercase tracking-wider">Unlimited Access</p>
                         </div>
                     </div>
                 </div>
@@ -156,7 +249,7 @@ const DoubtSolver = ({ retryableFetch }) => {
                             {/* Sender Info - Compact */}
                             <div className="flex items-center mb-1.5 px-1 opacity-70 hover:opacity-100 transition-opacity">
                                 <span className={`text-[10px] font-bold uppercase tracking-widest ${msg.role === 'user' ? 'text-theme-muted' : 'text-brand-primary'}`}>
-                                    {msg.role === 'user' ? 'You' : 'Atlas'}
+                                    {msg.role === 'user' ? 'You' : 'Aurem'}
                                 </span>
                                 <span className="mx-2 text-[10px] text-theme-muted/50">•</span>
                                 <span className="flex items-center text-[10px] text-theme-muted">
@@ -173,6 +266,12 @@ const DoubtSolver = ({ retryableFetch }) => {
                                 {msg.isSyllabusVerified && (
                                     <div className="mb-2 inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-bold uppercase tracking-wider">
                                         <BookOpen className="w-3 h-3 mr-1.5" /> Context Verified
+                                    </div>
+                                )}
+
+                                {msg.image && (
+                                    <div className="mb-3 rounded-xl overflow-hidden shadow-lg border border-white/10">
+                                        <img src={msg.image} alt="Uploaded Question" className="w-full h-auto max-h-60 object-cover" />
                                     </div>
                                 )}
 
@@ -198,29 +297,73 @@ const DoubtSolver = ({ retryableFetch }) => {
 
             {/* Input Area - Grounded & Compact */}
             <div className={`p-4 z-20 ${isDark ? 'bg-midnight-900/80' : 'bg-warm-50/80'} backdrop-blur-xl border-t ${isDark ? 'border-white/5' : 'border-black/5'} sticky bottom-0`}>
-                <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto relative flex items-center gap-3">
-                    <div className="relative flex-1 group">
-                        <div className={`absolute inset-0 rounded-2xl bg-gradient-to-r from-brand-primary to-brand-secondary opacity-0 group-hover:opacity-10 transition-opacity duration-300 blur-md`}></div>
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            placeholder="Ask Atlas anything..."
-                            className={`relative w-full py-4 pl-6 pr-12 ${isDark ? 'bg-midnight-800 text-white placeholder:text-gray-500' : 'bg-white text-gray-900 placeholder:text-gray-400'} border ${isDark ? 'border-white/10 focus:border-brand-primary/50' : 'border-warm-200 focus:border-brand-primary/30'} rounded-2xl outline-none transition-all shadow-sm focus:shadow-md text-base font-medium`}
-                            disabled={isLoading}
-                        />
-                        <button
-                            type="submit"
-                            disabled={isLoading || !input.trim()}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-brand-primary hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-brand-primary text-white rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center"
-                        >
-                            <Send className="w-4 h-4" />
-                        </button>
-                    </div>
-                </form>
+                <div className="max-w-4xl mx-auto space-y-2">
+                    {/* Image Preview */}
+                    {imagePreview && (
+                        <div className="flex items-center gap-2 animate-slide-up">
+                            <div className="relative group">
+                                <img src={imagePreview} alt="Preview" className="w-16 h-16 rounded-xl object-cover border-2 border-brand-primary shadow-lg" />
+                                <button
+                                    onClick={clearImage}
+                                    className="absolute -top-2 -right-2 p-1 bg-rose-500 text-white rounded-full shadow-md hover:bg-rose-600 transition-colors"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <span className="text-xs text-brand-primary font-bold animate-pulse">Image attached</span>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSendMessage} className="relative flex items-center gap-3">
+                        <div className="relative flex-1 group flex items-center gap-2">
+                            {/* Image Upload Button */}
+                            <div className="relative">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageUpload}
+                                    className="hidden"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-center relative group/btn
+                                        ${isDark ? 'border-white/10 bg-white/5 hover:bg-white/10' : 'border-warm-200 bg-white hover:bg-warm-100'}
+                                    `}
+                                    title={isPro ? "Upload Image Question" : "Upload Image Question (Pro Only)"}
+                                >
+                                    <Image className={`w-5 h-5 ${isPro ? 'text-brand-primary' : 'text-gray-400'}`} />
+                                    {!isPro && (
+                                        <div className="absolute -top-1 -right-1 bg-amber-500 rounded-full p-0.5 border-2 border-white dark:border-midnight-900">
+                                            <Crown className="w-2 h-2 text-white" />
+                                        </div>
+                                    )}
+                                </button>
+                            </div>
+
+                            <div className={`absolute inset-0 rounded-2xl bg-gradient-to-r from-brand-primary to-brand-secondary opacity-0 group-hover:opacity-10 transition-opacity duration-300 blur-md pointer-events-none`}></div>
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder={selectedImage ? "Add a question about this image..." : "Ask Aurem anything..."}
+                                className={`relative w-full py-4 pl-6 pr-12 ${isDark ? 'bg-midnight-800 text-white placeholder:text-gray-500' : 'bg-white text-gray-900 placeholder:text-gray-400'} border ${isDark ? 'border-white/10 focus:border-brand-primary/50' : 'border-warm-200 focus:border-brand-primary/30'} rounded-2xl outline-none transition-all shadow-sm focus:shadow-md text-base font-medium`}
+                                disabled={isLoading}
+                            />
+                            <button
+                                type="submit"
+                                disabled={isLoading || (!input.trim() && !selectedImage)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-brand-primary hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-brand-primary text-white rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center"
+                            >
+                                <Send className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </form>
+                </div>
                 <div className="text-center mt-3">
                     <p className="text-[10px] text-theme-muted uppercase tracking-widest opacity-50">
-                        Made by Prraneet Priyaansh, founder of quantix, for students❤️
+                        Made with ❤️ by Praneet Priyansh for students
                     </p>
                 </div>
             </div>

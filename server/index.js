@@ -13,10 +13,13 @@ import authRoutes from './routes/auth.js';
 import aiRoutes from './routes/ai.js';
 console.log('[Startup] Routes imported.');
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load .env from server directory first, then fall back to root
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config(); // Also load root .env for any missing vars
+
 
 const app = express();
 const PORT = 5010; // Final move to a fresh port range

@@ -1,9 +1,11 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
-import { Bot, FileText, LogOut, Moon, Sun, ChevronRight, ChevronLeft, GraduationCap, FilePlus, ClipboardList, Mic } from './Icons';
+import { useSubscription } from '../contexts/SubscriptionContext';
+import { Bot, FileText, LogOut, Moon, Sun, ChevronRight, ChevronLeft, GraduationCap, FilePlus, ClipboardList, Mic, Sparkles, Crown } from './Icons';
 
 const Sidebar = ({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen, isCollapsed, setIsCollapsed, user, onLogin, onLogout }) => {
     const { isDark, toggleTheme } = useTheme();
+    const { tier, isPro, isDevMode, triggerUpgradeModal } = useSubscription();
 
     const navItems = [
         { id: 'doubt-solver', label: 'Doubt Solver', icon: Bot, section: 'section-doubt' },
@@ -40,11 +42,11 @@ const Sidebar = ({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen,
                     <div className="p-6 flex items-center justify-between">
                         {!isCollapsed && (
                             <div className="flex items-center gap-3 animate-slide-in-right">
-                                <div className="p-2 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-xl shadow-lg shadow-indigo-500/20">
-                                    <Bot className="w-6 h-6 text-white" />
+                                <div className="p-2 bg-gradient-to-tr from-amber-400 via-orange-500 to-rose-500 rounded-xl shadow-lg shadow-orange-500/20">
+                                    <Sparkles className="w-6 h-6 text-white" />
                                 </div>
-                                <span className="font-display font-bold text-xl tracking-tight text-theme-primary">
-                                    Atlas
+                                <span className="font-display font-black text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-amber-500 to-orange-600">
+                                    Aurem
                                 </span>
                             </div>
                         )}
@@ -106,6 +108,32 @@ const Sidebar = ({ currentView, setCurrentView, isSidebarOpen, setIsSidebarOpen,
                             {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
                             {!isCollapsed && <span className="text-sm font-medium text-theme-muted">Theme</span>}
                         </button>
+
+                        {/* Subscription Status / Upgrade Button */}
+                        {!isPro && !isDevMode ? (
+                            <button
+                                onClick={() => triggerUpgradeModal('upgrade')}
+                                className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-orange-500/20 hover:shadow-orange-500/40 ${isCollapsed ? 'justify-center' : ''}`}
+                            >
+                                <Crown className="w-5 h-5" />
+                                {!isCollapsed && (
+                                    <div className="flex-1 text-left">
+                                        <span className="text-sm font-bold">Upgrade to Pro</span>
+                                        <p className="text-[10px] opacity-80">Unlimited access</p>
+                                    </div>
+                                )}
+                            </button>
+                        ) : (
+                            <div className={`w-full p-3 rounded-xl flex items-center gap-3 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'} border border-amber-500/20 ${isCollapsed ? 'justify-center' : ''}`}>
+                                <Crown className="w-5 h-5 text-amber-500" />
+                                {!isCollapsed && (
+                                    <div className="flex-1">
+                                        <span className="text-sm font-bold text-amber-500">{isDevMode ? 'Dev Mode' : 'Pro Active'}</span>
+                                        <p className="text-[10px] text-theme-muted">All features unlocked</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className={`flex items-center gap-3 p-3 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-white/40'} ${isCollapsed ? 'justify-center' : ''}`}>
                             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center text-white font-bold shadow-md">

@@ -27,8 +27,14 @@ export const retryableFetch = async (url, options = {}, retries = 3) => {
         }
 
         const response = await fetch(url, { ...options, headers });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        return await response.json();
+        const data = await response.json();
+
+        // If response has an error, return it so caller can handle
+        if (!response.ok) {
+            return { error: data.error || data.message || `HTTP ${response.status}` };
+        }
+
+        return data;
     } catch (err) {
         if (retries > 0) return retryableFetch(url, options, retries - 1);
         throw err;

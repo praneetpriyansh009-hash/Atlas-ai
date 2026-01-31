@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { SubscriptionProvider, useSubscription } from './contexts/SubscriptionContext';
 import SplashScreen from './components/SplashScreen';
 import Sidebar from './components/Sidebar';
 import DoubtSolver from './components/DoubtSolver';
 import CollegeCompass from './components/CollegeCompass';
-import QuizAssessment from './components/QuizAssessment';
 import DocumentStudy from './components/DocumentStudy';
 import PodcastGenerator from './components/PodcastGenerator';
+import QuizAssessment from './components/QuizAssessment';
+import UpgradeModal from './components/UpgradeModal';
 import Login from './components/Login';
 import Signup from './components/Signup';
-import { Bot, GraduationCap, FileText, Menu, LogIn, FilePlus, Mic, Radio } from './components/Icons';
+import { Bot, GraduationCap, FileText, Menu, LogIn, FilePlus, Mic, Sparkles, ClipboardList } from './components/Icons';
 import { useRetryableFetch } from './utils/api';
-import { getCurrentUser, logoutUser } from './utils/auth';
 
 const AppContent = () => {
     const { isDark } = useTheme();
@@ -52,10 +53,10 @@ const AppContent = () => {
                 return <DocumentStudy retryableFetch={retryableFetch} />;
             case 'college-compass':
                 return <CollegeCompass retryableFetch={retryableFetch} />;
-            case 'quiz-assessment':
-                return <QuizAssessment retryableFetch={retryableFetch} />;
             case 'podcast-generator':
                 return <PodcastGenerator retryableFetch={retryableFetch} />;
+            case 'quiz-assessment':
+                return <QuizAssessment retryableFetch={retryableFetch} />;
             default:
                 return <DoubtSolver retryableFetch={retryableFetch} />;
         }
@@ -68,9 +69,9 @@ const AppContent = () => {
             case 'doubt-solver': return 'Doubt Solver';
             case 'document-study': return 'Document Study';
             case 'college-compass': return 'College Compass';
-            case 'quiz-assessment': return 'Assessment';
             case 'podcast-generator': return 'Podcast Studio';
-            default: return 'Atlas';
+            case 'quiz-assessment': return 'Quiz & Assessment';
+            default: return 'Aurem';
         }
     };
 
@@ -79,23 +80,26 @@ const AppContent = () => {
             case 'login':
             case 'signup': return <LogIn className="w-5 h-5 mr-2 text-theme-primary" />;
             case 'doubt-solver': return <Bot className="w-5 h-5 mr-2 text-indigo-500" />;
-            case 'document-study': return <FilePlus className="w-5 h-5 mr-2 text-emerald-500" />;
+            case 'document-study': return <FilePlus className="w-5 h-5 mr-2 text-orange-500" />;
             case 'college-compass': return <GraduationCap className="w-5 h-5 mr-2 text-sky-500" />;
-            case 'quiz-assessment': return <FileText className="w-5 h-5 mr-2 text-purple-500" />;
             case 'podcast-generator': return <Mic className="w-5 h-5 mr-2 text-rose-500" />;
-            default: return <Bot className="w-5 h-5 mr-2 text-indigo-500" />;
+            case 'quiz-assessment': return <ClipboardList className="w-5 h-5 mr-2 text-emerald-500" />;
+            default: return <Sparkles className="w-5 h-5 mr-2 text-orange-500" />;
         }
     };
 
     return (
-        <div className={`flex h-screen bg-theme-primary font-sans overflow-hidden transition-colors duration-300 selection:bg-indigo-500/30`}>
-            {/* Decorative blurs - theme aware */}
+        <div className={`flex h-screen bg-theme-primary font-sans overflow-hidden transition-colors duration-300 selection:bg-orange-500/30`}>
+            {/* Decorative blurs - Aurem theme */}
             <div className="fixed inset-0 z-0 opacity-30 pointer-events-none">
-                <div className={`absolute top-0 left-0 w-[500px] h-[500px] rounded-full blur-[128px] -translate-x-1/3 -translate-y-1/3 ${isDark ? 'bg-indigo-600' : 'bg-cyan-300'}`}></div>
-                <div className={`absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full blur-[128px] translate-x-1/3 translate-y-1/3 ${isDark ? 'bg-purple-600' : 'bg-rose-300'}`}></div>
+                <div className={`absolute top-0 left-0 w-[500px] h-[500px] rounded-full blur-[128px] -translate-x-1/3 -translate-y-1/3 ${isDark ? 'bg-amber-600' : 'bg-amber-300'}`}></div>
+                <div className={`absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full blur-[128px] translate-x-1/3 translate-y-1/3 ${isDark ? 'bg-rose-600' : 'bg-rose-300'}`}></div>
             </div>
 
             {isLoading && <SplashScreen onComplete={() => setIsLoading(false)} />}
+
+            {/* Upgrade Modal */}
+            <UpgradeModal />
 
             {currentUser && (
                 <Sidebar
@@ -153,10 +157,13 @@ const App = () => {
     return (
         <ThemeProvider>
             <AuthProvider>
-                <AuthGate />
+                <SubscriptionProvider>
+                    <AuthGate />
+                </SubscriptionProvider>
             </AuthProvider>
         </ThemeProvider>
     );
 };
 
 export default App;
+

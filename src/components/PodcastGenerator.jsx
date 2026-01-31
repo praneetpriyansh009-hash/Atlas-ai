@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Mic, Play, Pause, SkipBack, SkipForward, Radio, Volume2,
     FileText, Upload, Loader2, Check, Copy, X, ChevronRight,
-    Layers, Sparkles, MessageSquare, Bot, User, FilePlus
+    Layers, Sparkles, MessageSquare, Bot, User, FilePlus, Crown
 } from './Icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import * as pdfjsLib from 'pdfjs-dist';
 import { PODCAST_API_URL, useRetryableFetch } from '../utils/api';
 
@@ -14,10 +15,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.449/b
 const PodcastGenerator = () => {
     const { isDark } = useTheme();
     const { retryableFetch } = useRetryableFetch();
+    const { canUseFeature, incrementUsage, triggerUpgradeModal, isPro, getRemainingUses } = useSubscription();
 
     // --- State ---
     const [activeMode, setActiveMode] = useState('upload'); // 'upload' | 'syllabus'
-    const [provider, setProvider] = useState('groq'); // Default to Groq as requested
 
     // Upload Mode State
     const [documentContent, setDocumentContent] = useState('');
@@ -100,6 +101,12 @@ const PodcastGenerator = () => {
         if (activeMode === 'upload' && !documentContent) return alert("Please upload a document first.");
         if (activeMode === 'syllabus' && (!syllabus.topic || !syllabus.subject)) return alert("Please enter both a subject and a topic.");
 
+        // Check usage limits for Basic users
+        if (!canUseFeature('podcast')) {
+            triggerUpgradeModal('podcast');
+            return;
+        }
+
         setIsGenerating(true);
         setPodcastScript([]);
 
@@ -109,7 +116,8 @@ const PodcastGenerator = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     mode: activeMode,
-                    provider: provider,
+                    provider: 'groq', // Always use Groq
+                    tier: isPro ? 'pro' : 'basic', // Send tier for length adjustment
                     content: activeMode === 'upload' ? documentContent.slice(0, 8000) : null,
                     topics: activeMode === 'upload' ? topics : null,
                     syllabus: activeMode === 'syllabus' ? syllabus : null
@@ -120,6 +128,8 @@ const PodcastGenerator = () => {
                 setPodcastScript(response.script);
                 setCurrentLineIndex(-1);
                 setIsPlaybackFinished(false);
+                // Track usage after successful generation
+                incrementUsage('podcast');
             } else {
                 throw new Error("Invalid response format from server");
             }
@@ -253,23 +263,20 @@ const PodcastGenerator = () => {
                         </button>
                     </div>
 
-                    {/* AI Provider Switch */}
+                    {/* Tier Info */}
                     <div className={`p-4 rounded-3xl border flex items-center justify-between ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-                        <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">AI Engine</span>
-                        <div className="flex gap-2">
-                            {['auto', 'gemini', 'groq'].map(p => (
-                                <button
-                                    key={p}
-                                    onClick={() => setProvider(p)}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter transition-all
-                                        ${provider === p
-                                            ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-500'}
-                                    `}
-                                >
-                                    {p}
-                                </button>
-                            ))}
+                        <div className="flex items-center gap-2">
+                            {isPro ? (
+                                <>
+                                    <Crown className="w-4 h-4 text-amber-500" />
+                                    <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">PRO • 15 min podcasts</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">BASIC • 7 min podcasts</span>
+                                    <span className="text-[10px] text-rose-500 font-bold">({getRemainingUses('podcast')} left today)</span>
+                                </>
+                            )}
                         </div>
                     </div>
 

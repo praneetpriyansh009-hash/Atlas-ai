@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, FilePlus, Sparkles, BookOpen, Brain, CreditCard, Map, MessageSquare, Loader2, Bot, User, Upload, Layers, Lightbulb, FileText, X, ChevronRight, Copy, Check, MapPin, RefreshCw } from './Icons';
+import { Send, FilePlus, Sparkles, BookOpen, Brain, CreditCard, Map, MessageSquare, Loader2, Bot, User, Upload, Layers, Lightbulb, FileText, X, ChevronRight, Copy, Check, MapPin, RefreshCw, Crown } from './Icons';
 import { useTheme } from '../contexts/ThemeContext';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import * as pdfjsLib from 'pdfjs-dist';
 import { GROQ_API_URL, formatGroqPayload, useRetryableFetch } from '../utils/api';
 import RagService from '../utils/ragService';
@@ -11,6 +12,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@5.4.449/b
 const DocumentStudy = () => {
     const { isDark } = useTheme();
     const { retryableFetch } = useRetryableFetch();
+    const { canUseFeature, incrementUsage, triggerUpgradeModal, isPro, getRemainingUses } = useSubscription();
 
     // State
     const [documentContent, setDocumentContent] = useState('');
@@ -152,18 +154,20 @@ const DocumentStudy = () => {
     const handleToolAction = async (action) => {
         if (!documentContent && !fileData) return alert("Please upload a file first.");
 
+        // Document Study tools are UNLIMITED (no usage limits here)
+
         setIsLoading(true);
         setResult('');
 
         const prompts = {
-            summarize: "Summarize this document concisely with high-level bullet points and key takeaways. Focus on the most important information.",
-            explain: "Explain the main concepts of this document in simple terms, as if teaching a beginner. Use analogies if helpful.",
-            test: "Generate a short quiz (5 questions) based on this content. Format it as: Question, Options (A,B,C,D), and Correct Answer.",
-            flashcards: "Create 5 high-quality flashcards from this content. Format: Term - Definition."
+            summarize: "Summarize this document concisely with high-level bullet points and key takeaways. Use ✨ emojis for key points. Format beautifully with markdown headers and lists.",
+            explain: "Explain the main concepts of this document in simple terms, as if teaching a beginner. Use 💡 for insights, 📖 for definitions, and ✅ for key takeaways. Format with clear sections.",
+            test: "Generate a quiz (5 questions) based on this content. Use beautiful formatting with ❓ for questions and ✅ for answers. Format: ## Question 1 \n**Question text**\n\nA) Option 1\nB) Option 2\nC) Option 3\nD) Option 4\n\n**✅ Correct Answer:** A",
+            flashcards: "Create 5 high-quality flashcards from this content. Use 📝 for terms and 💡 for definitions. Format beautifully: ## Flashcard 1\n**📝 Term:** [term]\n**💡 Definition:** [definition]"
         };
 
         const basePrompt = prompts[action];
-        let systemPrompt = "You are ATLAS, an expert educational AI assistant.";
+        let systemPrompt = "You are AUREM, an expert educational AI assistant. Always format your responses beautifully with markdown, emojis, and clear structure.";
 
         // RAG / Context Building
         if (documentContent && !fileData) {
@@ -176,7 +180,9 @@ const DocumentStudy = () => {
         const response = await callGroq(basePrompt, systemPrompt);
 
         if (response.error) setResult("Error: " + response.error);
-        else setResult(response.content);
+        else {
+            setResult(response.content);
+        }
 
         setIsLoading(false);
     };
@@ -192,7 +198,7 @@ const DocumentStudy = () => {
         setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
         setIsChatLoading(true);
 
-        let systemPrompt = "You are ATLAS. Answer the question based on the document.";
+        let systemPrompt = "You are AUREM. Answer the question based on the document. Be helpful and format responses nicely.";
         if (documentContent && !fileData) {
             const truncatedContent = documentContent.slice(0, 15000);
             systemPrompt += `\n\nCONTEXT:\n${truncatedContent}`;
@@ -349,7 +355,7 @@ const DocumentStudy = () => {
                             {isLoading && (
                                 <div className="text-center py-12 animate-enter">
                                     <Loader2 className="w-10 h-10 text-orange-500 animate-spin mx-auto mb-4" />
-                                    <p className="text-xs font-bold text-orange-500 uppercase tracking-widest animate-pulse">Analyzing with Groq Llama 3...</p>
+                                    <p className="text-xs font-bold text-orange-500 uppercase tracking-widest animate-pulse">Aurem is analyzing...</p>
                                 </div>
                             )}
 
@@ -358,12 +364,46 @@ const DocumentStudy = () => {
                                     <button onClick={copyToClipboard} className="absolute top-6 right-6 p-2 rounded-lg hover:bg-gray-500/10 transition-colors">
                                         {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-gray-500" />}
                                     </button>
-                                    <div className="prose prose-invert max-w-none prose-p:leading-relaxed text-sm md:text-base">
+                                    <div className={`prose max-w-none prose-p:leading-relaxed text-sm md:text-base ${isDark ? 'prose-invert' : ''}`}>
                                         <React.Fragment>
-                                            {/* Simple basic formatting for the result text */}
-                                            {result.split('\n').map((line, i) => (
-                                                <p key={i} className={isDark ? 'text-gray-300' : 'text-gray-700'}>{line}</p>
-                                            ))}
+                                            {/* Enhanced markdown-like formatting */}
+                                            {result.split('\n').map((line, i) => {
+                                                // Handle headers
+                                                if (line.startsWith('## ')) {
+                                                    return <h2 key={i} className={`text-lg font-bold mt-6 mb-2 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>{line.replace('## ', '')}</h2>;
+                                                }
+                                                if (line.startsWith('### ')) {
+                                                    return <h3 key={i} className={`text-md font-bold mt-4 mb-2 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>{line.replace('### ', '')}</h3>;
+                                                }
+                                                if (line.startsWith('# ')) {
+                                                    return <h1 key={i} className={`text-xl font-black mt-6 mb-3 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>{line.replace('# ', '')}</h1>;
+                                                }
+                                                // Handle bold text with **
+                                                if (line.includes('**')) {
+                                                    const parts = line.split(/\*\*(.+?)\*\*/g);
+                                                    return (
+                                                        <p key={i} className={`my-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            {parts.map((part, j) =>
+                                                                j % 2 === 1 ? <strong key={j} className="font-bold">{part}</strong> : part
+                                                            )}
+                                                        </p>
+                                                    );
+                                                }
+                                                // Handle bullet points
+                                                if (line.trim().startsWith('- ') || line.trim().startsWith('• ')) {
+                                                    return (
+                                                        <div key={i} className={`flex gap-2 my-1 ml-4 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                                            <span className="text-orange-500">•</span>
+                                                            <span>{line.trim().replace(/^[-•]\s*/, '')}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                // Regular paragraph
+                                                if (line.trim()) {
+                                                    return <p key={i} className={`my-2 ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{line}</p>;
+                                                }
+                                                return <div key={i} className="h-2" />;
+                                            })}
                                         </React.Fragment>
                                     </div>
                                 </div>
@@ -384,8 +424,8 @@ const DocumentStudy = () => {
                                 {chatMessages.map((msg, i) => (
                                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-message`}>
                                         <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                                ? 'bg-orange-500 text-white rounded-br-none'
-                                                : isDark ? 'bg-gray-800 text-gray-200 rounded-tl-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'
+                                            ? 'bg-orange-500 text-white rounded-br-none'
+                                            : isDark ? 'bg-gray-800 text-gray-200 rounded-tl-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'
                                             }`}>
                                             {msg.text}
                                         </div>

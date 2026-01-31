@@ -1,10 +1,23 @@
 import express from 'express';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { verifyToken } from '../middleware/auth.js';
 import { validateAIRequest } from '../middleware/validation.js';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load .env from server directory
+const envPath = path.join(__dirname, '..', '.env');
+console.log(`[AI Service] Loading env from: ${envPath}`);
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+    console.log(`[AI Service] Dotenv error: ${result.error.message}`);
+} else {
+    console.log(`[AI Service] Env loaded successfully, GROQ in env:`, !!process.env.GROQ_API_KEY);
+}
 
 const router = express.Router();
 
@@ -90,11 +103,39 @@ const callGemini = async (prompt, modelName = "gemini-1.5-flash") => {
 
 // --- Route: Podcast ---
 router.post('/podcast', async (req, res) => {
-    const { content, topics, mode, syllabus, provider = 'auto' } = req.body;
+    const { content, topics, mode, syllabus, tier = 'basic' } = req.body;
+    const isPro = tier === 'pro' || tier === 'dev';
 
     try {
+        // Define podcast parameters based on tier
+        const podcastConfig = isPro ? {
+            exchanges: '20-25',
+            duration: '10-15 minutes',
+            depth: 'comprehensive and thoroughly detailed',
+            style: 'Use first-principles thinking, dive deep into underlying mechanisms, provide real-world examples, historical context, and practical applications. Each response should be substantive (3-5 sentences minimum).',
+            rules: `
+                - Make this a PREMIUM deep-dive lasting 10-15 minutes when spoken aloud.
+                - Sam should explain concepts from first principles, building up understanding layer by layer.
+                - Include specific examples, case studies, analogies, and real-world applications.
+                - Alex should ask probing follow-up questions that explore edge cases and deeper implications.
+                - Cover the topic COMPREHENSIVELY - don't skip any important subtopics.
+                - End with actionable takeaways and connections to other fields.
+            `
+        } : {
+            exchanges: '10-12',
+            duration: '7 minutes',
+            depth: 'clear and engaging',
+            style: 'Be concise but informative. Focus on the key concepts and main takeaways.',
+            rules: `
+                - Make this an engaging podcast lasting approximately 7 minutes when spoken aloud.
+                - Cover the main concepts clearly without going too deep into details.
+                - Sam should explain concepts simply and Alex should ask clarifying questions.
+                - Focus on the most important 3-4 key points of the topic.
+            `
+        };
+
         let promptText = `
-            You are an expert podcast script writer. 
+            You are an expert podcast script writer creating a ${isPro ? 'PREMIUM' : 'standard'} educational podcast.
             Create a highly engaging dialogue between Alex (beginner/curious) and Sam (expert/calm).
             
             ${mode === 'syllabus' && syllabus ? `
@@ -106,39 +147,26 @@ router.post('/podcast', async (req, res) => {
                 FOCAL POINTS: ${topics || 'General overview'}
             `}
             
+            PODCAST PARAMETERS:
+            - Target Duration: ${podcastConfig.duration}
+            - Number of Exchanges: ${podcastConfig.exchanges} exchanges total
+            - Depth Level: ${podcastConfig.depth}
+            - Style: ${podcastConfig.style}
+            
             STRICT RULES:
-            - Output ONLY a JSON object with a 'script' key.
+            - Output ONLY a valid JSON object with a 'script' key.
             - The value of 'script' MUST be an array of objects.
             - Each object: { "speaker": "Alex" | "Sam", "text": "..." }
-            - Make the conversation highly technical, detailed, and insightful.
-            - Sam should explain concepts using "first principles".
-            - Alex should ask follow-up questions that probe deeper into "why" and "how".
-            - 8-12 exchanges total (concise and high-impact).
-            - Do not be generic; use specific examples and data points.
+            ${podcastConfig.rules}
             - Valid JSON object/array only.
         `;
 
         let resultText = "";
         let usedProvider = "";
 
-        // Try selected provider or Gemini first in auto mode
-        if (provider === 'groq' || (provider === 'auto' && !GEMINI_API_KEY)) {
-            resultText = await callGroq(promptText);
-            usedProvider = "groq";
-        } else {
-            try {
-                resultText = await callGemini(promptText);
-                usedProvider = "gemini";
-            } catch (gemError) {
-                console.warn("[Podcast] Gemini failed, falling back to Groq:", gemError.message);
-                if (GROQ_API_KEY) {
-                    resultText = await callGroq(promptText);
-                    usedProvider = "groq";
-                } else {
-                    throw gemError;
-                }
-            }
-        }
+        // Always use Groq as per user request
+        resultText = await callGroq(promptText);
+        usedProvider = "groq";
 
         // Cleanup and Parse
         console.log(`[Podcast] Raw result length: ${resultText.length}`);
@@ -189,8 +217,16 @@ router.post('/groq', validateAIRequest, async (req, res) => {
             body: JSON.stringify({ ...req.body, model: req.body.model || GROQ_MODEL })
         });
         const data = await response.json();
+
+        // Forward API errors properly
+        if (!response.ok) {
+            console.error('[Groq Route] API Error:', data);
+            return res.status(response.status).json(data);
+        }
+
         res.json(data);
     } catch (error) {
+        console.error('[Groq Route] Server Error:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
